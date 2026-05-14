@@ -4,13 +4,49 @@ set -euo pipefail
 readonly VERSION='0.1.9'
 readonly BASE_DIR='/usr/local/share/macos-init'
 readonly CONFIG_FILE="${MACINIT_CONFIG:-"/usr/local/etc/macos-init.conf"}"
+readonly STATUS_FILE="${MACINIT_STATUS:-"/usr/local/var/run/macos-init.status"}"
 
 export MACINIT_CONFIG="$CONFIG_FILE"
 
 case "${1-}" in
-	-h | --help) echo "Usage: $0 [--help | --version]"; exit 0;;
+	-h | --help) echo "Usage: $0 [--help | --version | status [--wait]]"; exit 0;;
 	-V | --version) echo "macos-init $VERSION"; exit 0;;
+	status)
+		shift
+		_wait=
+		case "${1-}" in
+			--wait) _wait=1;;
+			'') ;;
+			*) echo "Unknown option: $1" >&2; exit 1;;
+		esac
+		if [ "$_wait" ]; then
+			while true; do
+				_s=$(cat "$STATUS_FILE" 2>/dev/null || true)
+				case "$_s" in done | error) break;; esac
+				sleep 1
+			done
+		fi
+		_s=$(cat "$STATUS_FILE" 2>/dev/null || echo 'not started')
+		echo "status: $_s"
+		case "$_s" in
+			done) exit 0;;
+			error) exit 1;;
+			*) exit 2;;
+		esac
+		;;
 esac
+
+_write_status() {
+	if [ $? -eq 0 ]; then
+		echo 'done' > "$STATUS_FILE"
+	else
+		echo 'error' > "$STATUS_FILE"
+	fi
+}
+
+mkdir -p "$(dirname "$STATUS_FILE")"
+echo 'running' > "$STATUS_FILE"
+trap _write_status EXIT
 
 # Defaults
 skip_scripts=
