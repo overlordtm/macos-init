@@ -47,7 +47,8 @@ read_params() {
 		fi
 	done
 
-	diskutil umount "$cloudinit_volume_label" >/dev/null
+	diskutil umount "$cloudinit_volume_label" >/dev/null \
+		|| warn "Failed to unmount $cloudinit_volume_label (may have been auto-ejected)"
 }
 
 check_cidata() {
