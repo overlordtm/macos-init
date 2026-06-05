@@ -26,13 +26,32 @@ ready() {
 	diskutil list physical "$cloudinit_volume_label" >/dev/null 2>&1 || return 1
 	mount_volume "$cloudinit_volume_label" 2>/dev/null || return 1
 	[ -f "$mount_dir/meta-data" ] && [ -f "$mount_dir/user-data" ] || return 1
-	head -n1 "$mount_dir/user-data" 2>/dev/null | grep -q '^#cloud-config'
+	head -n1 "$mount_dir/user-data" 2>/dev/null | grep -q '^#cloud-config' || return 1
+
+	# Wait for user-data content to stabilize (filesystem may not be
+	# immediately readable after mount on virtualized hardware).
+	local hash prev_hash
+	hash=$(md5 -q "$mount_dir/user-data" 2>/dev/null) || return 1
+	[ -n "$hash" ] || return 1
+
+	if [ "${_cidata_prev_hash-}" = "$hash" ]; then
+		_cidata_stable=$(( ${_cidata_stable:-0} + 1 ))
+	else
+		_cidata_stable=0
+	fi
+	_cidata_prev_hash="$hash"
+
+	[ "$_cidata_stable" -ge 5 ]
 }
 
 read_params() {
 	mount_volume "$cloudinit_volume_label" \
 		|| die "Failed to mount volume $cloudinit_volume_label"
 	check_cidata
+
+	echo "user-data content:" >&2
+	cat "$mount_dir/user-data" >&2
+	echo "---" >&2
 
 	set -f  # disable globbing
 
