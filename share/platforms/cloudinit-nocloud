@@ -25,7 +25,8 @@ command -v yq >/dev/null || die "yq was not found; install it using 'brew instal
 ready() {
 	diskutil list physical "$cloudinit_volume_label" >/dev/null 2>&1 || return 1
 	mount_volume "$cloudinit_volume_label" 2>/dev/null || return 1
-	[ -f "$mount_dir/meta-data" ] && [ -f "$mount_dir/user-data" ]
+	[ -f "$mount_dir/meta-data" ] && [ -f "$mount_dir/user-data" ] || return 1
+	head -n1 "$mount_dir/user-data" 2>/dev/null | grep -q '^#cloud-config'
 }
 
 read_params() {
