@@ -30,18 +30,16 @@ ready() {
 
 	# Wait for user-data content to stabilize (filesystem may not be
 	# immediately readable after mount on virtualized hardware).
-	local hash prev_hash
+	local hash prev_hash i
 	hash=$(md5 -q "$mount_dir/user-data" 2>/dev/null) || return 1
 	[ -n "$hash" ] || return 1
 
-	if [ "${_cidata_prev_hash-}" = "$hash" ]; then
-		_cidata_stable=$(( ${_cidata_stable:-0} + 1 ))
-	else
-		_cidata_stable=0
-	fi
-	_cidata_prev_hash="$hash"
-
-	[ "$_cidata_stable" -ge 5 ]
+	for i in 1 2 3 4 5; do
+		sleep 1
+		prev_hash="$hash"
+		hash=$(md5 -q "$mount_dir/user-data" 2>/dev/null) || return 1
+		[ "$hash" = "$prev_hash" ] || return 1
+	done
 }
 
 read_params() {
